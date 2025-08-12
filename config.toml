@@ -1,0 +1,66 @@
+# TinyId ID生成器配置文件
+
+[server]
+# 服务器监听地址
+host = "0.0.0.0"
+# 服务器监听端口
+port = 8080
+# 工作线程数 (建议设置为CPU核心数)
+workers = 8
+# 最大连接数
+max_connections = 100000
+# 请求超时时间（秒）
+request_timeout = 30
+# 启用CORS
+enable_cors = true
+
+[generator]
+# 工作节点ID (0-1023)
+worker_id = 1
+# 数据中心ID (0-31)
+datacenter_id = 1
+# 序列号位数
+sequence_bits = 12
+# 工作节点ID位数
+worker_id_bits = 10
+# 数据中心ID位数
+datacenter_id_bits = 5
+# 时间戳位数
+timestamp_bits = 41
+# 起始时间戳 (毫秒) - 2021-01-01 00:00:00 UTC
+epoch = 1609459200000
+
+[logging]
+# 日志级别 (trace, debug, info, warn, error)
+level = "info"
+# 日志文件路径 (可选)
+file_path = "logs/tinyid.log"
+# 是否输出到控制台
+console_output = true
+# 日志格式 (json, text)
+format = "json"
+
+[metrics]
+# 启用Prometheus指标
+enable_prometheus = true
+# 指标端口
+metrics_port = 9090
+# 指标路径
+metrics_path = "/metrics"
+# 启用健康检查
+enable_health_check = true
+
+# 性能优化配置
+[performance]
+# 预分配ID池大小
+id_pool_size = 1000
+# 批量生成最大数量
+max_batch_size = 10000
+# 时钟回拨容忍度（毫秒）
+clock_backward_tolerance = 5
+# 启用ID缓存
+enable_cache = true
+# 缓存大小
+cache_size = 10000
+# 缓存过期时间（秒）
+cache_ttl = 300 
