@@ -4,7 +4,7 @@ use tracing::error;
 
 use tokio_util::sync::CancellationToken;
 
-use tinyid::{config::ServerConfig, metric, server, Result};
+use tinyid::{config::ServerConfig, metric, service::HelloWorldService, Result};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -26,7 +26,10 @@ async fn main() -> Result<()> {
     });
 
     // 构建server
-    let server = server::HttpServer::new(ServerConfig::new(String::from("0.0.0.0"), 8080));
+    let server = server::HttpServer::new(
+        Arc::new(ServerConfig::new(String::from("0.0.0.0"), 8080)),
+        Arc::new(HelloWorldService::new()),
+    );
 
     // 启动server
     if let Err(e) = server.run_with_shutdown(shutdown_token.cancelled()).await {

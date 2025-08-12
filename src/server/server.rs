@@ -6,19 +6,19 @@
  * @Descriptiono
  * this server is used to how http server run
 */
-
 use crate::{config::ServerConfig, Result};
+use std::sync::Arc;
 
 pub struct HttpServer {
-    pub addr: String,
-    pub port: u16,
+    pub cfg: Arc<ServerConfig>,
+    pub hello_world_service: Arc<HelloWorldService>,
 }
 
 impl HttpServer {
-    pub fn new(cfg: ServerConfig) -> Self {
+    pub fn new(cfg: Arc<ServerConfig>, hello_world_service: Arc<HelloWorldService>) -> Self {
         Self {
-            addr: cfg.addr,
-            port: cfg.port,
+            cfg,
+            hello_world_service,
         }
     }
 
@@ -31,7 +31,7 @@ impl HttpServer {
         shutdown_signal: impl std::future::Future<Output = ()>,
     ) -> Result<()> {
         let listener =
-            tokio::net::TcpListener::bind(format!("{}:{}", self.addr, self.port)).await?;
+            tokio::net::TcpListener::bind(format!("{}:{}", self.cfg.addr, self.cfg.port)).await?;
         info!("Server is running on {}", listener.local_addr().unwrap());
 
         let app = Router::new().route("/", get(|| async { "Hello, World!" }));

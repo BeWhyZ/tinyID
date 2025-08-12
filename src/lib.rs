@@ -4,6 +4,7 @@ pub mod error;
 pub mod generator;
 pub mod metric;
 pub mod server;
+pub mod service;
 
 use dotenvy::dotenv;
 
