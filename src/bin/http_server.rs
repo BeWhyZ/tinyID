@@ -1,10 +1,9 @@
-use core::panic::PanicInfo;
-
-use tracing::error;
-
 use tokio_util::sync::CancellationToken;
+use tracing::{error, info};
 
-use tinyid::{config::ServerConfig, metric, service::HelloWorldService, Result};
+use std::sync::Arc;
+
+use tinyid::{config::ServerConfig, metric, server, Result};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -17,22 +16,21 @@ async fn main() -> Result<()> {
 
     // graceful shutdown
     let cancel_token = CancellationToken::new();
-    let shutdown_token = cancel_token.clone();
+    let signal_cancel_token = cancel_token.clone();
+    let shutdown_future = cancel_token.cancelled_owned();
+
     // start the shutdown signal
     tokio::spawn(async move {
         shutdown_signal().await;
         info!("Shutting down...");
-        cancel_token.cancel();
+        signal_cancel_token.cancel();
     });
 
     // 构建server
-    let server = server::HttpServer::new(
-        Arc::new(ServerConfig::new(String::from("0.0.0.0"), 8080)),
-        Arc::new(HelloWorldService::new()),
-    );
+    let (app, cleanup) = init_app(ServerConfig::new(String::from("0.0.0.0"), 8080))?;
 
     // 启动server
-    if let Err(e) = server.run_with_shutdown(shutdown_token.cancelled()).await {
+    if let Err(e) = app.run_with_shutdown(shutdown_future).await {
         error!("Server error: {}", e);
         return Err(e);
     }
@@ -40,6 +38,7 @@ async fn main() -> Result<()> {
     // 收到server退出信号
 
     // 清理资源
+    cleanup();
 
     info!("Server shutdown complete");
     Ok(())
@@ -68,4 +67,12 @@ async fn shutdown_signal() {
             .expect("Failed to install CTRL+C handler");
         info!("Received CTRL+C, shutting down...");
     }
+}
+
+fn init_app(cfg: ServerConfig) -> Result<(server::HttpServer, impl FnOnce())> {
+    let server = server::HttpServer::new(Arc::new(cfg));
+    let cleanup = || {
+        info!("clean up resource");
+    };
+    Ok((server, cleanup))
 }

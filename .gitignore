@@ -1,2 +1,18 @@
 /target
 /.bak
+
+**/*.rs.bk
+Cargo.lock
+tags
+
+
+# Editors/OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log

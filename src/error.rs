@@ -16,6 +16,9 @@ pub enum TinyIdError {
 
     #[error("Clock moved backwards by {0}ms")]
     ClockMovedBackwards(u64),
+
+    #[error("Server error: {0}")]
+    ServerError(String),
 }
 
 impl From<std::io::Error> for TinyIdError {

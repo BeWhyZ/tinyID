@@ -1,25 +1,18 @@
-use axum::{routing::get, Router};
+use axum::{response::Json, routing::get, Router};
+use serde::Deserialize;
+use std::sync::Arc;
+
+use super::server::HttpServer;
 
 impl HttpServer {
     pub fn create_router(&self) -> Router {
-        Router::new()
-            .route("/", get(|| async { "Hello, World!" }))
-            .route("/health", get(|| async { "OK" }))
-            .route("/metrics", get(|| async { "Metrics" }))
-            .route("/shutdown", post(|| async { "Shutting down..." }))
-            .route("/panic", get(|| async { panic!("Panic") }))
-            .route("/error", get(|| async { Err("Error") }))
-            .route(
-                "/timeout",
-                get(|| async {
-                    tokio::time::sleep(Duration::from_secs(10)).await;
-                    "Timeout"
-                }),
-            )
-            .route("/redirect", get(|| async { Redirect::temporary("/") }))
-            .route(
-                "/json",
-                get(|| async { Json(json!({ "message": "Hello, World!" })) }),
-            )
+        let hello_service = Arc::clone(&self.hello_world_service);
+        Router::new().route("/ping", get(|| async { "ok" })).route(
+            "/id",
+            get(move || {
+                let service = Arc::clone(&hello_service);
+                async move { Json(service.generate_id().await) }
+            }),
+        )
     }
 }
