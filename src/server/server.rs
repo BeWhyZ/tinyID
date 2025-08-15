@@ -12,14 +12,17 @@ use tracing::info;
 use crate::{config::ServerConfig, error::TinyIdError, service::HelloWorldService, Result};
 use std::sync::Arc;
 
+use crate::biz::HelloWorldUseCase;
+use crate::data::HelloWorldRepoImpl;
+
 pub struct HttpServer {
     pub cfg: Arc<ServerConfig>,
     pub hello_world_service: Arc<HelloWorldService>,
 }
 
 impl HttpServer {
-    pub fn new(cfg: Arc<ServerConfig>) -> Self {
-        let hello_world_service = Arc::new(HelloWorldService::new());
+    pub fn new(cfg: Arc<ServerConfig>, huc: Arc<HelloWorldUseCase<HelloWorldRepoImpl>>) -> Self {
+        let hello_world_service = Arc::new(HelloWorldService::new(huc));
         Self {
             cfg,
             hello_world_service,
