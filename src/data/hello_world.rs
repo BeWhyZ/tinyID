@@ -1,5 +1,4 @@
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
@@ -42,16 +41,10 @@ impl HelloWorldRepoImpl {
 #[derive(Debug)]
 struct IDGenerator {
     cfg: config::IdGeneratorConfig,
-    // 通过互斥锁保证 last_timestamp 与 sequence 的一致性更新
-    state: Mutex<State>,
+    // 原子打包状态：(timestamp << sequence_bits) | sequence
+    ts_seq: AtomicU64,
     start_time: SystemTime,
     total_generated: AtomicU64,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct State {
-    last_timestamp: u64,
-    sequence: u32,
 }
 
 impl IDGenerator {
@@ -66,10 +59,7 @@ impl IDGenerator {
 
         Ok(Self {
             cfg,
-            state: Mutex::new(State {
-                last_timestamp: 0,
-                sequence: 0,
-            }),
+            ts_seq: AtomicU64::new(0),
             start_time: SystemTime::now(),
             total_generated: AtomicU64::new(0),
         })
@@ -80,41 +70,130 @@ impl IDGenerator {
     }
 
     fn generate_id(&self) -> Result<u64, TinyIdError> {
+        let seq_bits = self.cfg.sequence_bits as u32;
+        let seq_mask: u64 = (1u64 << self.cfg.sequence_bits) - 1;
+        let max_seq: u64 = self.cfg.max_sequence as u64;
+
         loop {
             let now = self.get_current_timestamp()?;
 
-            // 加锁以原子方式更新 last_timestamp 与 sequence
-            let mut state = self.state.lock().unwrap();
+            let cur = self.ts_seq.load(Ordering::Acquire);
+            let cur_ts = cur >> seq_bits;
+            let cur_seq = cur & seq_mask;
 
-            // 时钟回拨检测
-            if now < state.last_timestamp {
-                let backwards = state.last_timestamp - now;
+            // 回拨
+            if now < cur_ts {
+                let backwards = cur_ts - now;
                 warn!("Clock moved backwards by {}ms, waiting", backwards);
-                // 释放锁等待一小段时间后重试，直到时钟追上
-                drop(state);
                 std::thread::sleep(Duration::from_micros(200));
                 continue;
             }
 
-            if now == state.last_timestamp {
-                // 相同毫秒内，序列号自增
-                state.sequence = state.sequence.wrapping_add(1);
-                if state.sequence > self.cfg.max_sequence {
-                    // 溢出：等待到下一毫秒
-                    drop(state);
+            if now == cur_ts {
+                // 同毫秒：CAS递增，不允许在同毫秒内序列回绕
+                if cur_seq >= max_seq {
                     std::thread::sleep(Duration::from_micros(200));
                     continue;
                 }
-            } else {
-                // 新毫秒：复位序列号
-                state.last_timestamp = now;
-                state.sequence = 0;
+                let next = (cur_ts << seq_bits) | (cur_seq + 1);
+                if let Ok(_) = self.ts_seq.compare_exchange_weak(
+                    cur,
+                    next,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                ) {
+                    let id = self.assemble_id(now, cur_seq as u32);
+                    self.total_generated.fetch_add(1, Ordering::Relaxed);
+                    return Ok(id);
+                }
+                continue;
             }
 
-            let id = self.assemble_id(state.last_timestamp, state.sequence);
-            self.total_generated.fetch_add(1, Ordering::Relaxed);
-            return Ok(id);
+            // 新毫秒：切换到新毫秒并分配首个序列0
+            let next = (now << seq_bits) | 1; // 存1，返回0
+            if let Ok(_) =
+                self.ts_seq
+                    .compare_exchange(cur, next, Ordering::AcqRel, Ordering::Acquire)
+            {
+                let id = self.assemble_id(now, 0);
+                self.total_generated.fetch_add(1, Ordering::Relaxed);
+                return Ok(id);
+            }
+            // 失败则重试
         }
+    }
+
+    /// 批量生成 count 个ID，采用CAS一次性预留序列区间，避免锁和逐个申请的开销
+    pub fn generate_ids_batch(&self, count: usize) -> Result<Vec<u64>, TinyIdError> {
+        let seq_bits = self.cfg.sequence_bits as u32;
+        let seq_mask: u64 = (1u64 << self.cfg.sequence_bits) - 1;
+        let max_seq: u64 = self.cfg.max_sequence as u64;
+
+        let mut remaining: u64 = count as u64;
+        let mut result = Vec::with_capacity(count);
+
+        while remaining > 0 {
+            let now = self.get_current_timestamp()?;
+            let cur = self.ts_seq.load(Ordering::Acquire);
+            let cur_ts = cur >> seq_bits;
+            let cur_seq = cur & seq_mask; // 已分配数量（下一序列号）
+
+            // 时钟回拨
+            if now < cur_ts {
+                let backwards = cur_ts - now;
+                warn!("Clock moved backwards by {}ms, waiting", backwards);
+                std::thread::sleep(Duration::from_micros(200));
+                continue;
+            }
+
+            if now == cur_ts {
+                let available = if cur_seq >= max_seq {
+                    0
+                } else {
+                    (max_seq - cur_seq)
+                };
+                if available == 0 {
+                    // 当前毫秒可用序列已满，等待下一毫秒
+                    std::thread::sleep(Duration::from_micros(200));
+                    continue;
+                }
+                let take = remaining.min(available);
+                let new_seq = cur_seq + take; // 预留 [cur_seq, new_seq)
+                let next = (cur_ts << seq_bits) | new_seq;
+                if let Ok(_) = self.ts_seq.compare_exchange_weak(
+                    cur,
+                    next,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                ) {
+                    for s in cur_seq..new_seq {
+                        result.push(self.assemble_id(now, s as u32));
+                    }
+                    self.total_generated
+                        .fetch_add(take as u64, Ordering::Relaxed);
+                    remaining -= take;
+                }
+            } else {
+                // 切换到新毫秒：一次性预留一段
+                let avail = max_seq + 1; // 该毫秒可用的总数 [0..=max_seq]
+                let take = remaining.min(avail);
+                let new_seq = take; // 存储为下一序列号
+                let next = (now << seq_bits) | new_seq;
+                if let Ok(_) =
+                    self.ts_seq
+                        .compare_exchange(cur, next, Ordering::AcqRel, Ordering::Acquire)
+                {
+                    for s in 0..take {
+                        result.push(self.assemble_id(now, s as u32));
+                    }
+                    self.total_generated
+                        .fetch_add(take as u64, Ordering::Relaxed);
+                    remaining -= take;
+                }
+            }
+        }
+
+        Ok(result)
     }
 
     fn get_current_timestamp(&self) -> Result<u64, TinyIdError> {
@@ -427,10 +506,15 @@ mod tests {
 
         let start = std::time::Instant::now();
         let count = 10000;
-        let mut ids = HashSet::new();
+        let mut unique_ids = HashSet::new();
+
         for _ in 0..count {
             let id = generator.generate_id().expect("ID generation failed");
-            assert!(ids.insert(id), "生成了重复的ID: {}", id);
+            assert!(
+                unique_ids.insert(id),
+                "发现重复ID: {:?}",
+                generator.parse_id(id)
+            );
         }
 
         let duration = start.elapsed();
