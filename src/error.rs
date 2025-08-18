@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum TinyIdError {
     #[error("Internal error: {0}")]
     InternalError(String),

@@ -1,3 +1,4 @@
+use anyhow::Result;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 
@@ -5,7 +6,7 @@ use std::sync::Arc;
 
 use tinyid::biz::HelloWorldUseCase;
 use tinyid::data::HelloWorldRepoImpl;
-use tinyid::{config::ServerConfig, metric, server, Result};
+use tinyid::{config::ServerConfig, metric, server};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -34,7 +35,7 @@ async fn main() -> Result<()> {
     // 启动server
     if let Err(e) = app.run_with_shutdown(shutdown_future).await {
         error!("Server error: {}", e);
-        return Err(e);
+        return Err(e.into());
     }
 
     // 收到server退出信号
@@ -73,7 +74,7 @@ async fn shutdown_signal() {
 
 fn init_app(cfg: ServerConfig) -> Result<(server::HttpServer, impl FnOnce())> {
     // data
-    let hello_world_repo = HelloWorldRepoImpl::new();
+    let hello_world_repo = HelloWorldRepoImpl::new(&cfg)?;
     let hello_world_uc = Arc::new(HelloWorldUseCase::new(Arc::new(hello_world_repo)));
     // TODO 优化这里的层级初始化问题。期望是每一个层级仅初始化一个上层即可，无需每次都来修改bin文件
 

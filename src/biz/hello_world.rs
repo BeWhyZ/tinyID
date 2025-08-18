@@ -1,7 +1,11 @@
 use std::sync::Arc;
 
-pub trait HelloWorldRepo: Send + Sync {
-    fn generate_id(&self) -> impl std::future::Future<Output = u64> + Send;
+// use anyhow::{Context, Result};
+
+use crate::TinyIdError;
+
+pub trait HelloWorldRepo: Send + Sync + std::fmt::Debug {
+    fn generate_id(&self) -> impl std::future::Future<Output = Result<u64, TinyIdError>> + Send;
 }
 
 #[derive(Debug)]
@@ -14,7 +18,7 @@ impl<R: HelloWorldRepo> HelloWorldUseCase<R> {
         Self { hrepo }
     }
 
-    pub async fn generate_id(&self) -> u64 {
+    pub async fn generate_id(&self) -> Result<u64, TinyIdError> {
         self.hrepo.generate_id().await
     }
 }

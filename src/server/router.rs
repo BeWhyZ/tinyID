@@ -1,5 +1,4 @@
 use axum::{response::Json, routing::get, Router};
-use serde::Deserialize;
 use std::sync::Arc;
 
 use super::server::HttpServer;
