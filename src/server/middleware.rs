@@ -276,7 +276,7 @@ mod tests {
     async fn test_tracing_middleware() {
         // 初始化测试用的 tracing
         crate::init_env();
-        crate::metric::init_logs();
+        crate::metric::init_tracing();
 
         // 创建测试路由
         let app = Router::new()

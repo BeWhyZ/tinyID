@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use init_tracing_opentelemetry;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 
