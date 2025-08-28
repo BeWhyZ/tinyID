@@ -24,20 +24,17 @@ tracing-subscriber = { version = "0.3", features = [
     "json",
     "registry",
 ] }
-tracing-opentelemetry = "0.31"
+tracing-opentelemetry = { version = "0.31" }
 opentelemetry = { version = "0.30" }
 opentelemetry_sdk = { version = "0.30", features = ["rt-tokio"] }
-opentelemetry-otlp = { version = "0.30", features = [
-    "trace",
-    "logs",
-    "metrics",
-    "grpc-tonic",
-    "reqwest-client",
-] }
+opentelemetry-otlp = { version = "0.30", features = ["trace", "grpc-tonic"] }
 opentelemetry-stdout = { version = "0.30", features = ["trace"] }
 opentelemetry-semantic-conventions = "0.30"
 tracing-opentelemetry-instrumentation-sdk = { version = "0.30" }
 axum-tracing-opentelemetry = { version = "0.30" }
+init-tracing-opentelemetry = { version = "0.30.1", features = [
+    "tracing_subscriber_ext",
+] }
 tower = "0.5"
 tower-http = { version = "0.6.6", features = [
     "trace",

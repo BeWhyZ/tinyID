@@ -16,7 +16,8 @@ async fn main() -> Result<()> {
 
     // 2. 初始化 tracing（统一入口）
     // very opinionated init of tracing, look at the source to make your own
-    let _guard = init_tracing_opentelemetry::tracing_subscriber_ext::init_subscribers()?;
+
+    metric::init_tracing()?;
 
     info!("TinyID HTTP Server starting...");
 
@@ -66,7 +67,6 @@ async fn main() -> Result<()> {
     // 10. 清理资源
     info!("Cleaning up resources...");
     cleanup();
-    tracing_cleanup.cleanup();
 
     // 11. 检查服务器错误
     if let Err(e) = server_result {

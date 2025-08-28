@@ -2,19 +2,20 @@ use std::env;
 use std::sync::Once;
 
 use anyhow::Result;
-use opentelemetry::global::{self, BoxedTracer, ObjectSafeTracerProvider};
-use opentelemetry::trace::{Span, SpanKind, Status, Tracer};
+use opentelemetry::global;
+use opentelemetry::trace::TracerProvider;
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::SpanExporter;
-use opentelemetry_sdk::trace::Sampler;
-use opentelemetry_sdk::{propagation::TraceContextPropagator, trace::SdkTracerProvider, Resource};
-use tracing::{error, info, warn};
+use opentelemetry_sdk::trace::{Sampler, SdkTracerProvider, Tracer};
+use opentelemetry_sdk::Resource;
+use tracing::{error, info, warn, Subscriber};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::{
+    filter::EnvFilter,
     fmt::{self, format::FmtSpan},
     layer::SubscriberExt,
     util::SubscriberInitExt,
-    EnvFilter, Registry,
+    Layer, Registry,
 };
 
 static INIT: Once = Once::new();
@@ -95,7 +96,7 @@ fn init_opentelemetry(
             .expect("Failed to create span exporter");
 
         // 使用 batch exporter
-        opentelemetry_sdk::trace::SdkTracerProvider::builder()
+        SdkTracerProvider::builder()
             .with_resource(resource)
             .with_batch_exporter(exporter)
             .with_sampler(sampler)
@@ -105,10 +106,10 @@ fn init_opentelemetry(
         // 开发环境下使用 stdout exporter
         let exporter = opentelemetry_stdout::SpanExporter::default();
 
-        opentelemetry_sdk::trace::TracerProviderBuilder::default()
+        SdkTracerProvider::builder()
             .with_resource(resource)
-            .with_sampler(sampler)
             .with_batch_exporter(exporter)
+            .with_sampler(sampler)
             .build()
     };
 
@@ -137,14 +138,15 @@ fn try_init_tracing(config: &TracingConfig, cleanup: &mut TracingCleanup) -> Res
     cleanup.tracer_provider = Some(tracer_provider.clone());
 
     // 2. 创建 OpenTelemetry layer
-    let tracer = tracer_provider.boxed_tracer();
-    let otel_layer = OpenTelemetryLayer::new(tracer);
+    let trace_layer = tracing_opentelemetry::layer()
+        .with_error_records_to_exceptions(true)
+        .with_tracer(tracer_provider.tracer("tinyid"));
 
     // 3. 创建环境过滤器
     let env_filter =
         EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new(&config.log_level))?;
     // 4. 构建 subscriber
-    let registry = Registry::default().with(env_filter).with(otel_layer);
+    let registry = Registry::default().with(env_filter).with(trace_layer);
 
     // 5. 添加控制台输出层（如果启用）
     if config.console_output {
