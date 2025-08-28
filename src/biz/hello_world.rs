@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 // use anyhow::{Context, Result};
+use tracing::instrument;
 
 use crate::TinyIdError;
 
@@ -18,6 +19,7 @@ impl<R: HelloWorldRepo> HelloWorldUseCase<R> {
         Self { hrepo }
     }
 
+    #[instrument(skip(self))]
     pub async fn generate_id(&self) -> Result<u64, TinyIdError> {
         self.hrepo.generate_id().await
     }

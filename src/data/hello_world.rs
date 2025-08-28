@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use tracing::warn;
+use tracing::{instrument, warn};
 
 use crate::biz::HelloWorldRepo;
 use crate::{config, TinyIdError};
@@ -23,6 +23,7 @@ pub struct HelloWorldRepoImpl {
 }
 
 impl HelloWorldRepo for HelloWorldRepoImpl {
+    #[instrument(skip(self))]
     async fn generate_id(&self) -> Result<u64, TinyIdError> {
         self.id_generator.next_id()
     }

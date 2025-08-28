@@ -1,6 +1,7 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
+use init_tracing_opentelemetry;
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use std::sync::Arc;
 
@@ -10,40 +11,70 @@ use tinyid::{config::ServerConfig, metric, server};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // 初始化日志
-    metric::init_logs();
+    // 1. 初始化环境变量
+    tinyid::init_env();
 
-    // 加载配置
+    // 2. 初始化 tracing（统一入口）
+    // very opinionated init of tracing, look at the source to make your own
+    let _guard = init_tracing_opentelemetry::tracing_subscriber_ext::init_subscribers()?;
 
-    // 启动metrics server
+    info!("TinyID HTTP Server starting...");
 
-    // graceful shutdown
+    // 3. 初始化 metrics 系统
+    let (metrics_server, app_metrics) = metric::init_metrics()
+        .map_err(|e| anyhow::anyhow!("Failed to initialize metrics: {}", e))?;
+
+    // 4. 设置优雅关闭
     let cancel_token = CancellationToken::new();
     let signal_cancel_token = cancel_token.clone();
+    let metrics_cancel_token = cancel_token.clone();
     let shutdown_future = cancel_token.cancelled_owned();
 
-    // start the shutdown signal
+    // 5. 启动关闭信号监听
     tokio::spawn(async move {
         shutdown_signal().await;
-        info!("Shutting down...");
+        info!("Shutdown signal received, initiating graceful shutdown...");
         signal_cancel_token.cancel();
     });
 
-    // 构建server
-    let (app, cleanup) = init_app(ServerConfig::new(String::from("0.0.0.0"), 8080))?;
+    // 6. 启动 metrics 服务器
+    let metrics_handle = {
+        let metrics_shutdown = metrics_cancel_token.cancelled_owned();
+        tokio::spawn(async move {
+            if let Err(e) = metrics_server.start_with_shutdown(metrics_shutdown).await {
+                error!("Metrics server error: {}", e);
+            }
+        })
+    };
 
-    // 启动server
-    if let Err(e) = app.run_with_shutdown(shutdown_future).await {
+    // 7. 构建主应用服务器
+    let (app, cleanup) = init_app(
+        ServerConfig::new(String::from("0.0.0.0"), 8080),
+        app_metrics,
+    )?;
+
+    // 8. 启动主服务器
+    info!("Starting main HTTP server...");
+    let server_result = app.run_with_shutdown(shutdown_future).await;
+
+    // 9. 等待 metrics 服务器关闭
+    info!("Waiting for metrics server to shutdown...");
+    if let Err(e) = metrics_handle.await {
+        warn!("Metrics server task error: {}", e);
+    }
+
+    // 10. 清理资源
+    info!("Cleaning up resources...");
+    cleanup();
+    tracing_cleanup.cleanup();
+
+    // 11. 检查服务器错误
+    if let Err(e) = server_result {
         error!("Server error: {}", e);
         return Err(e.into());
     }
 
-    // 收到server退出信号
-
-    // 清理资源
-    cleanup();
-
-    info!("Server shutdown complete");
+    info!("TinyID HTTP Server shutdown complete");
     Ok(())
 }
 
@@ -72,15 +103,20 @@ async fn shutdown_signal() {
     }
 }
 
-fn init_app(cfg: ServerConfig) -> Result<(server::HttpServer, impl FnOnce())> {
+fn init_app(
+    cfg: ServerConfig,
+    app_metrics: Arc<metric::AppMetrics>,
+) -> Result<(server::HttpServer, impl FnOnce())> {
     // data
     let hello_world_repo = HelloWorldRepoImpl::new(&cfg)?;
     let hello_world_uc = Arc::new(HelloWorldUseCase::new(Arc::new(hello_world_repo)));
     // TODO 优化这里的层级初始化问题。期望是每一个层级仅初始化一个上层即可，无需每次都来修改bin文件
 
-    let server = server::HttpServer::new(Arc::new(cfg), hello_world_uc);
+    let server = server::HttpServer::new_with_metrics(Arc::new(cfg), hello_world_uc, app_metrics);
+
     let cleanup = || {
-        info!("clean up resource");
+        info!("Cleaning up application resources");
     };
+
     Ok((server, cleanup))
 }

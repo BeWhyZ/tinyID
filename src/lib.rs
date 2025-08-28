@@ -21,6 +21,6 @@ impl From<anyhow::Error> for TinyIdError {
     }
 }
 
-fn init_env() {
+pub fn init_env() {
     dotenv().ok();
 }

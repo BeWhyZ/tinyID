@@ -9,7 +9,10 @@
 
 use tracing::info;
 
-use crate::{config::ServerConfig, error::TinyIdError, service::HelloWorldServiceImpl, Result};
+use crate::{
+    config::ServerConfig, error::TinyIdError, metric::AppMetrics, service::HelloWorldServiceImpl,
+    Result,
+};
 use std::sync::Arc;
 
 use crate::biz::HelloWorldUseCase;
@@ -18,6 +21,7 @@ use crate::data::HelloWorldRepoImpl;
 pub struct HttpServer {
     pub cfg: Arc<ServerConfig>,
     pub hello_world_service: Arc<HelloWorldServiceImpl>,
+    pub metrics: Option<Arc<AppMetrics>>,
 }
 
 impl HttpServer {
@@ -26,6 +30,20 @@ impl HttpServer {
         Self {
             cfg,
             hello_world_service,
+            metrics: None,
+        }
+    }
+
+    pub fn new_with_metrics(
+        cfg: Arc<ServerConfig>,
+        huc: Arc<HelloWorldUseCase<HelloWorldRepoImpl>>,
+        metrics: Arc<AppMetrics>,
+    ) -> Self {
+        let hello_world_service = Arc::new(HelloWorldServiceImpl::new(huc));
+        Self {
+            cfg,
+            hello_world_service,
+            metrics: Some(metrics),
         }
     }
 

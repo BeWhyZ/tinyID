@@ -27,7 +27,7 @@ impl<R: HelloWorldRepo> HelloWorldService<R> {
     }
 
     /// 生成ID并返回Response格式
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub async fn generate_id(&self) -> Response<GenIdResp> {
         let id = match self.huc.generate_id().await {
             Ok(id) => id,
