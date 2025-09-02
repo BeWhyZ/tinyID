@@ -9,7 +9,7 @@ pub trait HelloWorldRepo: Send + Sync + std::fmt::Debug {
     fn generate_id(&self) -> impl std::future::Future<Output = Result<u64, TinyIdError>> + Send;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HelloWorldUseCase<R: HelloWorldRepo> {
     hrepo: Arc<R>,
 }

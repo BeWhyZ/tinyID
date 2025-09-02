@@ -1,4 +1,5 @@
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
@@ -17,9 +18,9 @@ use crate::{config, TinyIdError};
 /// - 批量生成
 /// - ID预分配池
 /// - 本地缓存
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HelloWorldRepoImpl {
-    id_generator: IDGenerator,
+    id_generator: Arc<IDGenerator>,
 }
 
 impl HelloWorldRepo for HelloWorldRepoImpl {
@@ -29,10 +30,8 @@ impl HelloWorldRepo for HelloWorldRepoImpl {
     }
 }
 
-impl HelloWorldRepoImpl {
-    pub fn new(cfg: &config::ServerConfig) -> Result<Self> {
-        let generator = IDGenerator::new(cfg.id_generator.clone())?;
-
+impl<'a> HelloWorldRepoImpl {
+    pub fn new(generator: Arc<IDGenerator>) -> Result<Self> {
         Ok(Self {
             id_generator: generator,
         })
@@ -40,7 +39,7 @@ impl HelloWorldRepoImpl {
 }
 
 #[derive(Debug)]
-struct IDGenerator {
+pub struct IDGenerator {
     cfg: config::IdGeneratorConfig,
     // 原子打包状态：(timestamp << sequence_bits) | sequence
     ts_seq: AtomicU64,
@@ -151,7 +150,7 @@ impl IDGenerator {
                 let available = if cur_seq >= max_seq {
                     0
                 } else {
-                    (max_seq - cur_seq)
+                    max_seq - cur_seq
                 };
                 if available == 0 {
                     // 当前毫秒可用序列已满，等待下一毫秒
@@ -257,6 +256,7 @@ mod tests {
             addr: "127.0.0.1".to_string(),
             port: 8080,
             id_generator: create_test_config(),
+            grpc_addr: vec!["[127.0.0.1]:50051".to_string()],
         }
     }
 
@@ -461,7 +461,8 @@ mod tests {
     #[test]
     fn test_hello_world_repo_impl_new() {
         let server_cfg = create_test_server_config();
-        let result = HelloWorldRepoImpl::new(&server_cfg);
+        let id_generator = IDGenerator::new(server_cfg.id_generator).unwrap();
+        let result = HelloWorldRepoImpl::new(Arc::new(id_generator));
         assert!(result.is_ok());
     }
 
@@ -469,15 +470,16 @@ mod tests {
     fn test_hello_world_repo_impl_new_invalid_config() {
         let mut server_cfg = create_test_server_config();
         server_cfg.id_generator.worker_id = server_cfg.id_generator.max_worker_id + 1;
-
-        let result = HelloWorldRepoImpl::new(&server_cfg);
+        let id_generator = IDGenerator::new(server_cfg.id_generator).unwrap();
+        let result = HelloWorldRepoImpl::new(Arc::new(id_generator));
         assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn test_hello_world_repo_generate_id() {
         let server_cfg = create_test_server_config();
-        let repo = HelloWorldRepoImpl::new(&server_cfg).unwrap();
+        let id_generator = IDGenerator::new(server_cfg.id_generator).unwrap();
+        let repo = HelloWorldRepoImpl::new(Arc::new(id_generator)).unwrap();
 
         let result = repo.generate_id().await;
         assert!(result.is_ok());
@@ -489,7 +491,8 @@ mod tests {
     #[tokio::test]
     async fn test_hello_world_repo_generate_multiple_ids() {
         let server_cfg = create_test_server_config();
-        let repo = HelloWorldRepoImpl::new(&server_cfg).unwrap();
+        let id_generator = IDGenerator::new(server_cfg.id_generator).unwrap();
+        let repo = HelloWorldRepoImpl::new(Arc::new(id_generator)).unwrap();
 
         let mut ids = HashSet::new();
         for _ in 0..100 {

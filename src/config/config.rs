@@ -5,14 +5,18 @@ pub struct ServerConfig {
     pub addr: String,
     pub port: u16,
     pub id_generator: IdGeneratorConfig,
+
+    // grpc 地址 [addr]:port, 可以有多个
+    pub grpc_addr: Vec<String>,
 }
 
 impl ServerConfig {
-    pub fn new(addr: String, port: u16) -> Self {
+    pub fn new(addr: String, port: u16, grpc_addr: Vec<String>) -> Self {
         Self {
             addr,
             port,
             id_generator: IdGeneratorConfig::default(),
+            grpc_addr,
         }
     }
 }

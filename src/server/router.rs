@@ -50,10 +50,7 @@ impl HttpServer {
                     .layer(TimeoutLayer::new(Duration::from_secs(30)))
                     // 请求 ID 传播
                     .layer(PropagateRequestIdLayer::x_request_id())
-                    .layer(SetRequestIdLayer::new(
-                        axum::http::header::HeaderName::from_static("x-request-id"),
-                        MyMakeRequestId::default(),
-                    ))
+                    .layer(SetRequestIdLayer::x_request_id(MyMakeRequestId::default()))
                     // OpenTelemetry tracing
                     .layer(axum::middleware::from_fn(
                         move |request: Request, next: Next| {

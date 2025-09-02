@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package id_generator.v1;
+
+import "google/api/annotations.proto";
+
+service IdGeneratorService {
+
+  rpc GenerateId(GenerateIdRequest) returns (GenerateIdResponse) {
+    option (google.api.http) = {
+      post : "/v1/id_generator/generate_id"
+      body : "*"
+    };
+  };
+}
+
+message GenerateIdRequest {}
+
+message GenerateIdResponse {
+  // id
+  uint64 id = 1;
+}

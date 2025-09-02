@@ -125,8 +125,7 @@ pub async fn tracing_middleware_with_config(
     let cx = parent_cx.with_span(span);
 
     // 调试：打印当前 span 的 trace_id
-    let current_trace_id = cx.span().span_context().trace_id().to_string();
-    info!("Current request trace_id: {}", current_trace_id);
+    // let current_trace_id = cx.span().span_context().trace_id().to_string();
 
     // 4. 创建 tracing span 并关联 OpenTelemetry context
     let tracing_span = tracing::info_span!(

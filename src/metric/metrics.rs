@@ -11,7 +11,7 @@ use axum::{
 };
 use serde_json::json;
 use tokio::net::TcpListener;
-use tracing::{error, info};
+use tracing::info;
 
 /// Metrics 配置
 #[derive(Debug, Clone)]

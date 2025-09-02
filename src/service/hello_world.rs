@@ -1,11 +1,15 @@
-use super::response::{ErrCode, Response};
-use serde::{Deserialize, Serialize};
-use tracing::{error, info};
-
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
+use tonic::{transport::Server, Request, Response as TResponse, Status};
+use tracing::{error, info};
+
+use super::response::{ErrCode, Response};
 use crate::biz::{HelloWorldRepo, HelloWorldUseCase};
 use crate::data::HelloWorldRepoImpl;
+
+use super::id_generator::id_generator_service_server::IdGeneratorService;
+use super::id_generator::{GenerateIdRequest, GenerateIdResponse};
 
 // 为实际使用创建类型别名
 pub type HelloWorldServiceImpl = HelloWorldService<HelloWorldRepoImpl>;
@@ -16,7 +20,7 @@ pub struct GenIdResp {
     pub id: u64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HelloWorldService<R: HelloWorldRepo> {
     huc: Arc<HelloWorldUseCase<R>>,
 }
@@ -39,6 +43,25 @@ impl<R: HelloWorldRepo> HelloWorldService<R> {
         let data = GenIdResp { id };
         info!("Generated ID: {}", id);
         Response::success(Some(data))
+    }
+}
+
+#[tonic::async_trait]
+impl IdGeneratorService for HelloWorldService<HelloWorldRepoImpl> {
+    /// 生成ID并返回Response格式
+    #[tracing::instrument(skip(self))]
+    async fn generate_id(
+        &self,
+        _request: Request<GenerateIdRequest>,
+    ) -> Result<TResponse<GenerateIdResponse>, Status> {
+        let id_resp = self.huc.generate_id().await;
+        match id_resp {
+            Ok(id) => return Ok(TResponse::new(GenerateIdResponse { id: id })),
+            Err(e) => {
+                error!("generate id failed: {}", e);
+                return Err(Status::internal("generate id failed"));
+            }
+        }
     }
 }
 

@@ -5,7 +5,7 @@ use tracing::{error, info, warn};
 use std::sync::Arc;
 
 use tinyid::biz::HelloWorldUseCase;
-use tinyid::data::HelloWorldRepoImpl;
+use tinyid::data::{HelloWorldRepoImpl, IDGenerator};
 use tinyid::{config::ServerConfig, metric, server};
 
 #[tokio::main]
@@ -49,7 +49,7 @@ async fn main() -> Result<()> {
 
     // 7. 构建主应用服务器
     let (app, cleanup) = init_app(
-        ServerConfig::new(String::from("0.0.0.0"), 8080),
+        ServerConfig::new(String::from("0.0.0.0"), 8080, vec![]),
         app_metrics,
     )?;
 
@@ -107,11 +107,13 @@ fn init_app(
     app_metrics: Arc<metric::AppMetrics>,
 ) -> Result<(server::HttpServer, impl FnOnce())> {
     // data
-    let hello_world_repo = HelloWorldRepoImpl::new(&cfg)?;
+    let id_generator = IDGenerator::new(cfg.id_generator.clone()).unwrap();
+    let hello_world_repo = HelloWorldRepoImpl::new(Arc::new(id_generator))?;
     let hello_world_uc = Arc::new(HelloWorldUseCase::new(Arc::new(hello_world_repo)));
     // TODO 优化这里的层级初始化问题。期望是每一个层级仅初始化一个上层即可，无需每次都来修改bin文件
 
-    let server = server::HttpServer::new_with_metrics(Arc::new(cfg), hello_world_uc, app_metrics);
+    let server =
+        server::HttpServer::new_with_metrics(Arc::new(cfg.clone()), hello_world_uc, app_metrics);
 
     let cleanup = || {
         info!("Cleaning up application resources");
