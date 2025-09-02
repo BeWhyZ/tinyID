@@ -6,17 +6,45 @@ pub struct ServerConfig {
     pub port: u16,
     pub id_generator: IdGeneratorConfig,
 
-    // grpc 地址 [addr]:port, 可以有多个
+    // grpc server 地址 [addr]:port, 可以有多个
     pub grpc_addr: Vec<String>,
+
+    // grpc client地址
+    pub id_generator_rpc: IdGeneratorRpcConfig,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RpcConfig {
+    pub addr: Vec<String>,
+}
+
+pub type IdGeneratorRpcConfig = RpcConfig;
+
 impl ServerConfig {
-    pub fn new(addr: String, port: u16, grpc_addr: Vec<String>) -> Self {
+    pub fn new(
+        addr: String,
+        port: u16,
+        grpc_addr: Vec<String>,
+        id_generator_rpc: IdGeneratorRpcConfig,
+    ) -> Self {
         Self {
             addr,
             port,
             id_generator: IdGeneratorConfig::default(),
             grpc_addr,
+            id_generator_rpc,
+        }
+    }
+
+    pub fn default_for_test() -> Self {
+        Self {
+            addr: "127.0.0.1".to_string(),
+            port: 8080,
+            id_generator: IdGeneratorConfig::default(),
+            grpc_addr: vec!["[127.0.0.1]:50051".to_string()],
+            id_generator_rpc: IdGeneratorRpcConfig {
+                addr: vec!["[127.0.0.1]:50051".to_string()],
+            },
         }
     }
 }

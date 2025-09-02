@@ -4,8 +4,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use tonic::transport::Channel;
 use tracing::{instrument, warn};
 
+use super::rpc_client::id_generator_service_client::IdGeneratorServiceClient;
 use crate::biz::HelloWorldRepo;
 use crate::{config, TinyIdError};
 
@@ -20,21 +22,23 @@ use crate::{config, TinyIdError};
 /// - 本地缓存
 #[derive(Debug, Clone)]
 pub struct HelloWorldRepoImpl {
-    id_generator: Arc<IDGenerator>,
+    ig: Arc<IDGenerator>,
+    igc: IdGeneratorServiceClient<Channel>,
 }
 
 impl HelloWorldRepo for HelloWorldRepoImpl {
     #[instrument(skip(self))]
     async fn generate_id(&self) -> Result<u64, TinyIdError> {
-        self.id_generator.next_id()
+        self.ig.next_id()
     }
 }
 
 impl<'a> HelloWorldRepoImpl {
-    pub fn new(generator: Arc<IDGenerator>) -> Result<Self> {
-        Ok(Self {
-            id_generator: generator,
-        })
+    pub fn new(
+        generator: Arc<IDGenerator>,
+        igc: IdGeneratorServiceClient<Channel>,
+    ) -> Result<Self> {
+        Ok(Self { ig: generator, igc })
     }
 }
 
@@ -252,12 +256,7 @@ mod tests {
     }
 
     fn create_test_server_config() -> config::ServerConfig {
-        config::ServerConfig {
-            addr: "127.0.0.1".to_string(),
-            port: 8080,
-            id_generator: create_test_config(),
-            grpc_addr: vec!["[127.0.0.1]:50051".to_string()],
-        }
+        config::ServerConfig::default_for_test()
     }
 
     fn create_invalid_worker_id_config() -> config::IdGeneratorConfig {
