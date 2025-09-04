@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use tonic::transport::Channel;
 use tracing::{instrument, warn};
 
-use super::rpc_client::id_generator_service_client::IdGeneratorServiceClient;
 use crate::biz::HelloWorldRepo;
 use crate::{config, TinyIdError};
 
@@ -23,7 +22,6 @@ use crate::{config, TinyIdError};
 #[derive(Debug, Clone)]
 pub struct HelloWorldRepoImpl {
     ig: Arc<IDGenerator>,
-    igc: IdGeneratorServiceClient<Channel>,
 }
 
 impl HelloWorldRepo for HelloWorldRepoImpl {
@@ -34,11 +32,8 @@ impl HelloWorldRepo for HelloWorldRepoImpl {
 }
 
 impl<'a> HelloWorldRepoImpl {
-    pub fn new(
-        generator: Arc<IDGenerator>,
-        igc: IdGeneratorServiceClient<Channel>,
-    ) -> Result<Self> {
-        Ok(Self { ig: generator, igc })
+    pub fn new(generator: Arc<IDGenerator>) -> Result<Self> {
+        Ok(Self { ig: generator })
     }
 }
 

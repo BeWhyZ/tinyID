@@ -20,3 +20,15 @@ message GenerateIdResponse {
   // id
   uint64 id = 1;
 }
+
+service UserDemo {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {};
+}
+
+message GetUserRequest { uint64 id = 1; }
+
+message GetUserResponse {
+  string name = 1;
+  int32 age = 2;
+  uint64 id = 3;
+}

@@ -7,6 +7,7 @@ pub fn new_id_generator_client(
     cfg: IdGeneratorRpcConfig,
 ) -> Result<IdGeneratorServiceClient<Channel>, Box<dyn std::error::Error>> {
     let endpoints = cfg
+        .rpc_cfg
         .addr
         .into_iter()
         .map(|a| Channel::from_shared(a).unwrap());

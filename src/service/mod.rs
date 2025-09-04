@@ -2,6 +2,7 @@ use tonic::{transport::Server, Request, Response, Status};
 
 pub mod hello_world;
 pub mod response;
+pub mod user_demo;
 
 // rpc service
 pub use hello_world::{HelloWorldService, HelloWorldServiceImpl};

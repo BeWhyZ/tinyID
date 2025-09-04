@@ -11,6 +11,11 @@ path = "src/bin/http_server.rs"
 name = "grpc_server"
 path = "src/bin/grpc_server.rs"
 
+[[bin]]
+name = "grpc_user"
+path = "src/bin/grpc_user.rs"
+
+
 [dependencies]
 # 异步运行时
 tokio = { version = "1.0", features = ["full"] }

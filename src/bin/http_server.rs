@@ -5,7 +5,7 @@ use tracing::{error, info, warn};
 use std::sync::Arc;
 
 use tinyid::biz::HelloWorldUseCase;
-use tinyid::data::{HelloWorldRepoImpl, IDGenerator};
+use tinyid::data::{new_id_generator_client, HelloWorldRepoImpl, IDGenerator};
 use tinyid::{config::ServerConfig, metric, server};
 
 #[tokio::main]
