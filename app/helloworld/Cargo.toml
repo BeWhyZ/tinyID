@@ -1,0 +1,45 @@
+[package]
+name = "tinyid"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "http-server"
+path = "src/bin/http_server.rs"
+
+[[bin]]
+name = "grpc-server"
+path = "src/bin/grpc_server.rs"
+
+[dependencies]
+# 内部依赖
+shared = { path = "../../libs/shared" }
+
+# 从workspace继承的依赖
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+axum = { workspace = true }
+http = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tonic = { workspace = true }
+prost = { workspace = true }
+futures = { workspace = true }
+
+
+# trace
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+opentelemetry = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+opentelemetry-stdout = { workspace = true }
+opentelemetry-semantic-conventions = { workspace = true }
+tracing-opentelemetry-instrumentation-sdk = { workspace = true }
