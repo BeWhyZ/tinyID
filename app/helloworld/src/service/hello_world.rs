@@ -28,13 +28,13 @@ pub struct GetUserReq {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct GetUserResp {
-    id: u64,
-    name: String,
-    age: i32,
-    email: String,
-    created_at: i64,
-    updated_at: i64,
+pub struct GetUserResp {
+    pub id: u64,
+    pub name: String,
+    pub age: i32,
+    pub email: String,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -52,8 +52,8 @@ impl<R: HelloWorldRepo, U: UserDemoRepo> HelloWorldService<R, U> {
         Self { huc, uuc }
     }
 
-    /// 生成ID并返回Response格式
-    #[tracing::instrument(skip(self))]
+    /// 生成ID并返回Response格式  
+    #[tracing::instrument(skip(self), fields(operation = "generate_id"))]
     pub async fn generate_id(&self) -> Json<Response<GenIdResp>> {
         let id = match self.huc.generate_id().await {
             Ok(id) => id,
@@ -71,8 +71,14 @@ impl<R: HelloWorldRepo, U: UserDemoRepo> HelloWorldService<R, U> {
         Json(Response::success(Some(data)))
     }
 
-    /// 生成ID并返回Response格式
-    #[tracing::instrument(skip(self))]
+    /// 获取用户信息
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            operation = "get_user",
+            user_id = %req.id,
+        )
+    )]
     pub async fn get_user(&self, Query(req): Query<GetUserReq>) -> Json<Response<GetUserResp>> {
         let user = match self.uuc.get_user(req.id).await {
             Ok(user) => user,
@@ -99,8 +105,8 @@ impl<R: HelloWorldRepo, U: UserDemoRepo> HelloWorldService<R, U> {
 
 #[tonic::async_trait]
 impl IdGeneratorService for HelloWorldService<HelloWorldRepoImpl, HelloWorldRepoImpl> {
-    /// 生成ID并返回Response格式
-    #[tracing::instrument(skip(self))]
+    /// gRPC生成ID接口
+    #[tracing::instrument(skip(self), fields(operation = "grpc_generate_id", protocol = "grpc"))]
     async fn generate_id(
         &self,
         _request: Request<GenerateIdRequest>,

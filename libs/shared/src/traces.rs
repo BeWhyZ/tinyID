@@ -153,7 +153,7 @@ fn try_init_tracing(config: &TracingConfig, cleanup: &mut TracingCleanup) -> Res
         if config.json_format {
             let fmt_layer = fmt::layer()
                 .json()
-                .with_span_events(FmtSpan::NEW | FmtSpan::CLOSE)
+                .with_span_events(FmtSpan::NEW | FmtSpan::ENTER | FmtSpan::EXIT) // 只显示进入和退出，不显示CLOSE汇总
                 .with_timer(fmt::time::UtcTime::rfc_3339())
                 .with_target(false)
                 .with_level(true)

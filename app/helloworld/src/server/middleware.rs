@@ -128,10 +128,12 @@ pub async fn tracing_middleware_with_config(
     // let current_trace_id = cx.span().span_context().trace_id().to_string();
 
     // 4. 创建 tracing span 并关联 OpenTelemetry context
+    let request_id = uuid::Uuid::new_v4().to_string();
     let tracing_span = tracing::info_span!(
         "http_request",
+        request_id = %request_id,
         method = %(method),
-        path = %(path)    ,
+        path = %(path),
         query = %query,
         user_agent = %user_agent,
     );
@@ -140,7 +142,7 @@ pub async fn tracing_middleware_with_config(
     let _guard = tracing_span.enter();
 
     // 记录请求开始
-    info!("Request started");
+    info!(service.ready = true, message = "processing request");
 
     // 5. 处理请求
     let mut response = next.run(request).await;
